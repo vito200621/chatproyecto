@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CompilerConfiguration">
+    <bytecodeTargetLevel target="17">
+      <module name="ChatProyecto.main" target="21" />
+      <module name="ChatProyecto.test" target="21" />
+      <module name="victoria" target="21" />
+      <module name="victoria.main" target="21" />
+      <module name="victoria.test" target="21" />
+    </bytecodeTargetLevel>
+  </component>
+</project>

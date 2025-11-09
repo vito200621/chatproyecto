@@ -1,0 +1,43 @@
+subprojects {
+    apply plugin: 'java'
+    apply plugin: 'application'
+
+    // Configure repositories
+    repositories {
+        mavenCentral()
+    }
+
+    // Use Java 17 toolchain
+    java {
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(17)
+        }
+    }
+
+    // Encoding
+    tasks.withType(JavaCompile).configureEach {
+        options.encoding = 'UTF-8'
+    }
+
+    // Optional buildDir relocation on Windows to avoid file locks (OneDrive, antivirus, IDEs).
+    // Enable by setting -PchatProyecto.buildBase or environment variable CHATPROYECTO_BUILD_BASE.
+    // If neither is set, Gradle's default buildDir (module/build inside the project) will be used.
+    def propBase = providers.gradleProperty('chatProyecto.buildBase').orNull
+    def envBase = System.getenv('CHATPROYECTO_BUILD_BASE')
+    def effectiveBase = propBase ?: envBase
+    if (effectiveBase) {
+        buildDir = file("${effectiveBase}\\${project.name}")
+    }
+
+    // Ensure Gradle run tasks never set their working directory inside build/classes
+    tasks.withType(JavaExec).configureEach {
+        workingDir = project.projectDir
+    }
+
+    // Helper: print effective buildDir for diagnostics
+    tasks.register('printBuildDir') {
+        doLast {
+            println "[BUILD_INFO] ${project.path} buildDir = ${project.buildDir}"
+        }
+    }
+}

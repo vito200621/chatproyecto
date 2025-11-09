@@ -1,0 +1,6 @@
+/*
+ * ChatProyecto multi-project settings
+ */
+rootProject.name = 'ChatProyecto'
+include 'server'
+include 'client'
