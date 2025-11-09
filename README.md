@@ -354,10 +354,7 @@ El proxy traduce peticiones HTTP a estos comandos TCP:
 | **Almacenamiento** | Archivos de texto (.log) |
 | **Protocolo** | HTTP (web↔proxy), TCP (proxy↔backend) |
 
-## Autores
 
-- Emanuel Murillo - A00405783
-- Victoria Restrepo - A00405025
 
 ## Notas Adicionales
 
@@ -368,6 +365,4 @@ El proxy traduce peticiones HTTP a estos comandos TCP:
 
 ---
 
-**Fecha**: Enero 2025
-**Curso**: Sistemas Operativos / Redes
-**Tarea**: 2 - Cliente HTTP para Sistema de Chat
+
