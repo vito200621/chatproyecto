@@ -113,8 +113,8 @@ public class ChatServer implements AutoCloseable {
             List<ClientHandler> members = new ArrayList<>();
             members.add(creator);
             groups.put(groupName, members);
-            creator.send("✓ Grupo '" + groupName + "' creado exitosamente.");
-            creator.send("Otros usuarios pueden unirse con: /joinGroup " + groupName);
+            creator.send("Grupo '" + groupName + "' creado exitosamente.");
+            creator.send("Otros usuarios pueden unirse: " + groupName);
             System.out.println("[Servidor] Grupo creado: " + groupName + " por usuario " + creator.getId());
         }
     }
@@ -221,10 +221,5 @@ public class ChatServer implements AutoCloseable {
         sb.append("Únete con: /joinGroup <nombre>");
         client.send(sb.toString());
     }
-
-    private ClientHandler findClientById(int clientId) {
-        return clients.get(clientId);
-    }
-
 
 }
