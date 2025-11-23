@@ -132,6 +132,11 @@ public class ClientHandler implements Runnable {
                     continue;
                 }
 
+                if (line.equals("/listGroups")) {
+                    server.listGroups(this);
+                    continue;
+                }
+
             }
 
         } catch (IOException e) {

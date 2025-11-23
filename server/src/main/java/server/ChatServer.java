@@ -108,12 +108,14 @@ public class ChatServer implements AutoCloseable {
 
     public void createGroup(String groupName, ClientHandler creator) {
         if (groups.containsKey(groupName)) {
-            creator.send("Group '" + groupName + "' already exists.");
+            creator.send("El grupo '" + groupName + "' ya existe.");
         } else {
             List<ClientHandler> members = new ArrayList<>();
             members.add(creator);
             groups.put(groupName, members);
-            creator.send("Group '" + groupName + "' created and you have joined it.");
+            creator.send("✓ Grupo '" + groupName + "' creado exitosamente.");
+            creator.send("Otros usuarios pueden unirse con: /joinGroup " + groupName);
+            System.out.println("[Servidor] Grupo creado: " + groupName + " por usuario " + creator.getId());
         }
     }
 
@@ -150,14 +152,22 @@ public class ChatServer implements AutoCloseable {
     public synchronized void addUserToGroup(String groupName, ClientHandler user) {
         List<ClientHandler> members = groups.get(groupName);
         if (members == null) {
-            user.send("Group '" + groupName + "' does not exist.");
+            user.send(" El grupo '" + groupName + "' no existe.");
             return;
         }
         if (!members.contains(user)) {
             members.add(user);
-            user.send("You have joined the group '" + groupName + "'.");
+            user.send(" Te has unido al grupo '" + groupName + "'.");
+
+            // Notificar a otros miembros
+            for (ClientHandler member : members) {
+                if (member != user) {
+                    member.send("[Sistema] El usuario " + user.getId() + " se ha unido al grupo");
+                }
+            }
+            System.out.println("[Servidor] Usuario " + user.getId() + " se unió al grupo " + groupName);
         } else {
-            user.send("You are already in the group '" + groupName + "'.");
+            user.send("ℹ Ya estás en el grupo '" + groupName + "'.");
         }
     }
 
@@ -194,6 +204,26 @@ public class ChatServer implements AutoCloseable {
         }
 
         System.out.println("Nota de voz enviada al grupo " + groupName + " por usuario " + fromId);
+    }
+
+    public synchronized void listGroups(ClientHandler client) {
+        if (groups.isEmpty()) {
+            client.send("No hay grupos existentes. Crea uno con /createGroup <nombre>");
+            return;
+        }
+
+        StringBuilder sb = new StringBuilder("--- GRUPOS DISPONIBLES ---\n");
+        for (String groupName : groups.keySet()) {
+            List<ClientHandler> members = groups.get(groupName);
+            sb.append("- ").append(groupName)
+                    .append(" (").append(members.size()).append(" miembros)\n");
+        }
+        sb.append("Únete con: /joinGroup <nombre>");
+        client.send(sb.toString());
+    }
+
+    private ClientHandler findClientById(int clientId) {
+        return clients.get(clientId);
     }
 
 

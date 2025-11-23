@@ -3,6 +3,7 @@
 
 - Emanuel Murillo A00405783
 - Victoria Restrepo A00405025
+- Alejandro 
 ## Descripción del Proyecto
 
 Este proyecto implementa un **cliente web** (HTML, CSS, JavaScript) que se comunica con el backend de chat en Java a través de un **servidor proxy HTTP** construido con Express.js. El proxy actúa como intermediario, traduciendo las peticiones HTTP del navegador a comandos TCP que el servidor Java puede entender.

@@ -30,6 +30,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Cargar datos guardados localmente
     loadLocalData();
 
+    // Cargar grupos del servidor
+    loadGroupsFromServer();
+
     // Iniciar polling de mensajes y clientes
     startPolling();
 
@@ -67,6 +70,10 @@ function setupEventListeners() {
     document.getElementById('createGroupForm').addEventListener('submit', handleCreateGroup);
     document.getElementById('addContactForm').addEventListener('submit', handleAddContact);
 
+
+    // Refrescar grupos
+    document.getElementById('refreshGroupsBtn').addEventListener('click', loadGroupsFromServer);
+
     // Cerrar modales
     document.querySelectorAll('.modal-close, .modal-cancel').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -83,6 +90,31 @@ function setupEventListeners() {
             }
         });
     });
+}
+
+async function loadGroupsFromServer() {
+    try {
+        const response = await fetch(`${PROXY_URL}/api/groups/list`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ clientId: appState.clientId })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            // Limpiar grupos locales y cargar desde servidor
+            appState.groups = data.groups || [];
+            saveLocalData();
+            renderGroups();
+            showNotification('Grupos actualizados desde el servidor', 'success');
+        } else {
+            console.error('Error al cargar grupos:', data.error);
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error al cargar grupos del servidor');
+    }
 }
 
 // ==================== Manejo de Logout ====================
@@ -171,6 +203,7 @@ function renderGroups() {
             <div class="group-info">
                 <div class="group-name">${groupName}</div>
             </div>
+            <button class="btn-join" onclick="joinGroup('${groupName}')">Unirse</button>
         </div>
     `).join('');
 
@@ -181,6 +214,37 @@ function renderGroups() {
             selectChat('group', groupName);
         });
     });
+}
+
+async function joinGroup(groupName) {
+    try {
+        const response = await fetch(`${PROXY_URL}/api/groups/join`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                clientId: appState.clientId,
+                groupName: groupName
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            showNotification(`Te has unido al grupo ${groupName}`, 'success');
+
+            // Si no está en la lista local, agregarlo
+            if (!appState.groups.includes(groupName)) {
+                appState.groups.push(groupName);
+                saveLocalData();
+                renderGroups();
+            }
+        } else {
+            alert('Error: ' + data.error);
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error al unirse al grupo');
+    }
 }
 
 // ==================== Manejo de Contactos ====================
