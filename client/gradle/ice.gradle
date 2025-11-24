@@ -1,0 +1,17 @@
+// gradle/ice.gradle
+configurations {
+    slice
+}
+
+dependencies {
+    slice 'com.zeroc:ice:3.7.6'
+}
+
+task compileSlice(type: Exec) {
+    dependsOn configurations.slice
+
+    commandLine 'cmd', '/c', 'slice2java', '--output-dir', 'src/main/java', 'src/main/slice/Chat.ice'
+
+}
+
+compileJava.dependsOn compileSlice
