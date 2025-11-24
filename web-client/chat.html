@@ -188,5 +188,112 @@
     </div>
 
     <script src="js/app.js"></script>
+    <script>
+        // Modo demo - simula funcionalidad sin backend
+        document.addEventListener('DOMContentLoaded', () => {
+            const clientId = sessionStorage.getItem('clientId');
+            if (!clientId) {
+                window.location.href = 'index.html';
+                return;
+            }
+
+            document.getElementById('currentUserId').textContent = clientId;
+
+            // Mostrar mensaje de bienvenida
+            const messagesContainer = document.getElementById('messagesContainer');
+            messagesContainer.innerHTML = `
+            <div class="welcome-message">
+                <h3>¡Modo Demo Activado! 🚀</h3>
+                <p>Tu ID: <strong>${clientId}</strong></p>
+                <p>Esta es una demostración del frontend. Las funcionalidades completas requieren el servidor backend.</p>
+                <ul>
+                    <li>Interfaz de chat completamente funcional</li>
+                    <li>Gestión de contactos y grupos (local)</li>
+                    <li>interfaz de mensajes</li>
+                    <li>Ice RPC: Por implementar</li>
+                    <li>Audio Web: Por implementar</li>
+                </ul>
+                <p><em>Para funcionalidad completa, ejecuta el servidor Java con: <code>./gradlew run</code></em></p>
+            </div>
+        `;
+
+            // Configurar event listeners básicos
+            setupDemoEventListeners();
+        });
+
+        function setupDemoEventListeners() {
+            // Logout
+            document.getElementById('logoutBtn').addEventListener('click', () => {
+                sessionStorage.removeItem('clientId');
+                window.location.href = 'index.html';
+            });
+
+            // Enviar mensaje (demo)
+            document.getElementById('messageForm').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const messageInput = document.getElementById('messageInput');
+                const message = messageInput.value.trim();
+
+                if (message) {
+                    // Simular mensaje enviado
+                    const clientId = sessionStorage.getItem('clientId');
+                    addDemoMessage('sent', clientId, message);
+                    messageInput.value = '';
+
+                    // Simular respuesta automática después de 1 segundo
+                    setTimeout(() => {
+                        addDemoMessage('received', 'Sistema', `Echo: ${message}`);
+                    }, 1000);
+                }
+            });
+
+            // Demo de grupos
+            document.getElementById('createGroupBtn').addEventListener('click', () => {
+                const groupName = prompt('Nombre del grupo:');
+                if (groupName) {
+                    alert(`Grupo "${groupName}" creado (demo)`);
+                }
+            });
+
+            // Demo de contactos
+            document.getElementById('addContactBtn').addEventListener('click', () => {
+                const contactId = prompt('ID del contacto:');
+                if (contactId) {
+                    alert(`Contacto ${contactId} agregado (demo)`);
+                }
+            });
+        }
+
+        function addDemoMessage(type, from, content) {
+            const container = document.getElementById('messagesContainer');
+
+            // Remover mensaje de bienvenida si existe
+            const welcomeMsg = container.querySelector('.welcome-message');
+            if (welcomeMsg) {
+                welcomeMsg.remove();
+            }
+
+            // Mostrar área de entrada si está oculta
+            document.getElementById('messageInputContainer').style.display = 'block';
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+
+            const senderName = type === 'sent' ? 'Tú' : from;
+
+            messageDiv.innerHTML = `
+            <div class="message-bubble">
+                <div class="message-header">
+                    <span class="message-sender">${senderName}</span>
+                    <span class="message-timestamp">${new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</span>
+                </div>
+                <div class="message-content">${content}</div>
+            </div>
+        `;
+
+            container.appendChild(messageDiv);
+            container.scrollTop = container.scrollHeight;
+        }
+    </script>
 </body>
 </html>

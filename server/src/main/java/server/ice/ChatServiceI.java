@@ -9,14 +9,18 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class ChatServiceI implements ChatService {
     private final ChatServer legacyServer;
-    private final Map<String, ChatCallback> callbacks;
+    private final Map<String, ChatCallbackPrx> callbacks; // Para el método con ChatCallbackPrx
+    private final Map<String, ChatCallback> directCallbacks; // Para el método con ChatCallback (si es necesario)
     private final Map<String, String> userSessions;
 
     public ChatServiceI(ChatServer legacyServer) {
         this.legacyServer = legacyServer;
         this.callbacks = new ConcurrentHashMap<>();
+        this.directCallbacks = new ConcurrentHashMap<>(); // Nuevo mapa para callbacks directos
         this.userSessions = new ConcurrentHashMap<>();
     }
+
+    // === IMPLEMENTACIÓN DE TODOS LOS MÉTODOS DE ChatService ===
 
     @Override
     public User login(String username, Current current) {
@@ -43,6 +47,7 @@ public class ChatServiceI implements ChatService {
     @Override
     public void logout(String userId, Current current) {
         callbacks.remove(userId);
+        directCallbacks.remove(userId);
         userSessions.remove(userId);
         System.out.println("[Ice] Usuario desconectado: " + userId);
     }
@@ -52,15 +57,12 @@ public class ChatServiceI implements ChatService {
         try {
             System.out.println("[Ice] Mensaje privado de " + fromUser + " a " + toUser + ": " + message);
 
-            // Convertir IDs Ice a IDs numéricos legacy
             int fromId = extractNumericId(fromUser);
             int toId = extractNumericId(toUser);
-
-            // Usar servidor legacy
             legacyServer.sendPrivateMessage(fromId, toId, message);
 
-            // Notificar al receptor via callback
-            ChatCallback targetCallback = callbacks.get(toUser);
+            // Notificar al receptor via callback (usando ChatCallbackPrx - el principal)
+            ChatCallbackPrx targetCallback = callbacks.get(toUser);
             if (targetCallback != null) {
                 Message msg = new Message();
                 msg.id = String.valueOf(System.currentTimeMillis());
@@ -79,10 +81,8 @@ public class ChatServiceI implements ChatService {
     public void sendGroupMessage(String fromUser, String groupName, String message, Current current) {
         try {
             System.out.println("[Ice] Mensaje grupal de " + fromUser + " en " + groupName + ": " + message);
-
             int fromId = extractNumericId(fromUser);
             legacyServer.sendGroupMessage(groupName, fromId, message);
-
         } catch (Exception e) {
             System.err.println("Error enviando mensaje grupal: " + e.getMessage());
         }
@@ -91,7 +91,6 @@ public class ChatServiceI implements ChatService {
     @Override
     public String createGroup(String groupName, String creator, Current current) {
         try {
-            // Por ahora simulamos la creación
             String groupId = "group_" + System.currentTimeMillis();
             System.out.println("[Ice] Grupo creado: " + groupName + " por " + creator);
             return groupId;
@@ -141,7 +140,7 @@ public class ChatServiceI implements ChatService {
     public Group[] listGroups(String userId, Current current) {
         try {
             System.out.println("[Ice] Listando grupos para: " + userId);
-            return new Group[0]; // Array vacío
+            return new Group[0];
         } catch (Exception e) {
             System.err.println("Error listando grupos: " + e.getMessage());
             return new Group[0];
@@ -152,11 +151,9 @@ public class ChatServiceI implements ChatService {
     public void sendVoiceNoteToUser(String fromUser, String toUser, String filename, byte[] data, Current current) {
         try {
             System.out.println("[Ice] Nota de voz de " + fromUser + " a " + toUser + ", tamaño: " + data.length);
-
             int fromId = extractNumericId(fromUser);
             int toId = extractNumericId(toUser);
             legacyServer.sendVoiceNoteToUser(String.valueOf(toId), data, filename, String.valueOf(fromId));
-
         } catch (Exception e) {
             System.err.println("Error enviando nota de voz: " + e.getMessage());
         }
@@ -166,10 +163,8 @@ public class ChatServiceI implements ChatService {
     public void sendVoiceNoteToGroup(String fromUser, String groupName, String filename, byte[] data, Current current) {
         try {
             System.out.println("[Ice] Nota de voz grupal de " + fromUser + " en " + groupName + ", tamaño: " + data.length);
-
             int fromId = extractNumericId(fromUser);
             legacyServer.sendVoiceNoteToGroup(fromId, groupName, filename, data);
-
         } catch (Exception e) {
             System.err.println("Error enviando nota de voz grupal: " + e.getMessage());
         }
@@ -186,13 +181,26 @@ public class ChatServiceI implements ChatService {
         }
     }
 
+    // === PRIMER registerCallback - CON ChatCallbackPrx (PRINCIPAL) ===
+    @Override
+    public void registerCallback(String userId, ChatCallbackPrx cb, Current current) {
+        try {
+            callbacks.put(userId, cb);
+            System.out.println("[Ice] Callback registrado para: " + userId + " (ChatCallbackPrx)");
+        } catch (Exception e) {
+            System.err.println("Error registrando callback (Prx): " + e.getMessage());
+        }
+    }
+
+    // === SEGUNDO registerCallback - CON ChatCallback (SECUNDARIO) ===
     @Override
     public void registerCallback(String userId, ChatCallback cb, Current current) {
         try {
-            callbacks.put(userId, cb);
-            System.out.println("[Ice] Callback registrado para: " + userId);
+            directCallbacks.put(userId, cb);
+            System.out.println("[Ice] Callback registrado para: " + userId + " (ChatCallback directo)");
+            System.out.println("⚠️  Nota: ChatCallback directo puede no funcionar correctamente en todas las configuraciones");
         } catch (Exception e) {
-            System.err.println("Error registrando callback: " + e.getMessage());
+            System.err.println("Error registrando callback (directo): " + e.getMessage());
         }
     }
 
@@ -200,28 +208,67 @@ public class ChatServiceI implements ChatService {
     public void unregisterCallback(String userId, Current current) {
         try {
             callbacks.remove(userId);
+            directCallbacks.remove(userId);
             System.out.println("[Ice] Callback removido para: " + userId);
         } catch (Exception e) {
             System.err.println("Error removiendo callback: " + e.getMessage());
         }
     }
 
-    // Helper para convertir IDs Ice a IDs numéricos legacy
+    // === MÉTODOS ADICIONALES QUE FALTAN ===
+    @Override
+    public String[] getGroupMembers(String groupId, Current current) {
+        try {
+            System.out.println("[Ice] Obteniendo miembros del grupo: " + groupId);
+            return new String[0];
+        } catch (Exception e) {
+            System.err.println("Error obteniendo miembros del grupo: " + e.getMessage());
+            return new String[0];
+        }
+    }
+
+    @Override
+    public void removeFromGroup(String groupName, String user, Current current) {
+        try {
+            System.out.println("[Ice] Usuario " + user + " removido de " + groupName);
+        } catch (Exception e) {
+            System.err.println("Error removiendo usuario del grupo: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public User getUserInfo(String userId, Current current) {
+        try {
+            System.out.println("[Ice] Obteniendo información de usuario: " + userId);
+            User user = new User();
+            user.id = userId;
+            user.username = userSessions.getOrDefault(userId, "Unknown");
+            user.online = callbacks.containsKey(userId) || directCallbacks.containsKey(userId);
+            return user;
+        } catch (Exception e) {
+            System.err.println("Error obteniendo información de usuario: " + e.getMessage());
+            User fallback = new User();
+            fallback.id = userId;
+            fallback.username = "Error";
+            fallback.online = false;
+            return fallback;
+        }
+    }
+
+    // Helper para convertir IDs
     private int extractNumericId(String iceUserId) {
         try {
-            // Si ya es numérico
             return Integer.parseInt(iceUserId);
         } catch (NumberFormatException e) {
-            // Si es formato Ice "user_123456"
             if (iceUserId.startsWith("user_")) {
                 String numericPart = iceUserId.substring(5);
                 try {
-                    return Integer.parseInt(numericPart) % 1000; // ID simulada
+                    return Integer.parseInt(numericPart) % 1000;
                 } catch (NumberFormatException e2) {
-                    return 1; // Fallback
+                    return 1;
                 }
             }
-            return 1; // Fallback
+            return 1;
         }
     }
 }

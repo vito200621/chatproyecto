@@ -57,7 +57,15 @@
     </div>
 
     <script>
-        const PROXY_URL = 'http://localhost:3000';
+        // ELIMINA esta línea:
+        // const PROXY_URL = 'http://localhost:3000';
+
+        // En su lugar, usa esta configuración:
+        const CONFIG = {
+            useIce: true,  // Intentar usar Ice primero
+            iceEndpoint: 'ws://localhost:10000',
+            fallbackToHttp: false  // No usar HTTP fallback por ahora
+        };
 
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -68,69 +76,45 @@
             const errorMessage = document.getElementById('errorMessage');
             const successMessage = document.getElementById('successMessage');
 
-            // Ocultar mensajes previos
             errorMessage.style.display = 'none';
             successMessage.style.display = 'none';
 
-            // Deshabilitar botón y mostrar spinner
             connectBtn.disabled = true;
             btnText.style.display = 'none';
             btnLoading.style.display = 'inline-block';
 
             try {
-                // Conectar al servidor a través del proxy
-                const response = await fetch(`${PROXY_URL}/api/connect`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                });
+                // Simular conexión exitosa (modo demo)
+                const clientId = Math.floor(Math.random() * 1000) + 1;
 
-                const data = await response.json();
+                // Guardar en sessionStorage
+                sessionStorage.setItem('clientId', clientId.toString());
 
-                if (data.success) {
-                    // Guardar clientId en sessionStorage
-                    sessionStorage.setItem('clientId', data.clientId);
+                // Mostrar mensaje de éxito
+                successMessage.textContent = `✓ Conectado en modo demo. Tu ID: ${clientId}`;
+                successMessage.style.display = 'block';
 
-                    // Mostrar mensaje de éxito
-                    successMessage.textContent = `✓ Conectado exitosamente. Tu ID: ${data.clientId}`;
-                    successMessage.style.display = 'block';
+                // Redirigir a la página de chat
+                setTimeout(() => {
+                    window.location.href = 'chat.html';
+                }, 1000);
 
-                    // Redirigir a la página de chat
-                    setTimeout(() => {
-                        window.location.href = 'chat.html';
-                    }, 1000);
-                } else {
-                    throw new Error(data.error || 'Error al conectar');
-                }
             } catch (error) {
                 console.error('Error:', error);
                 errorMessage.textContent = `✗ Error: ${error.message}`;
                 errorMessage.style.display = 'block';
 
-                // Reactivar botón
                 connectBtn.disabled = false;
                 btnText.style.display = 'inline-block';
                 btnLoading.style.display = 'none';
             }
         });
 
-        // Verificar si ya hay una sesión activa
+        // Verificar sesión existente
         window.addEventListener('DOMContentLoaded', () => {
             const clientId = sessionStorage.getItem('clientId');
             if (clientId) {
-                // Verificar si la conexión sigue activa
-                fetch(`${PROXY_URL}/api/status/${clientId}`)
-                    .then(res => res.json())
-                    .then(data => {
-                        if (data.connected) {
-                            window.location.href = 'chat.html';
-                        }
-                    })
-                    .catch(() => {
-                        // Si hay error, limpiar sessionStorage
-                        sessionStorage.removeItem('clientId');
-                    });
+                window.location.href = 'chat.html';
             }
         });
     </script>

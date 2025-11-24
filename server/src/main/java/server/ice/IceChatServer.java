@@ -15,7 +15,7 @@ public class IceChatServer implements AutoCloseable {
 
     public void start() {
         try {
-            System.out.println("🚀 Iniciando servidor Ice...");
+            System.out.println("Iniciando servidor Ice...");
 
             // Configuración para WebSockets
             String[] args = new String[] {

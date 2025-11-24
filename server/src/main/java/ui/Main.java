@@ -9,8 +9,8 @@ public class Main {
         int udpPort = 6000;
         int poolSize = 8;
 
-        System.out.println("🚀 Iniciando servidores...");
-        System.out.println("📍 TCP: " + tcpPort + ", UDP: " + udpPort + ", Ice WebSocket: 10000");
+        System.out.println("Iniciando servidores...");
+        System.out.println("TCP: " + tcpPort + ", UDP: " + udpPort + ", Ice WebSocket: 10000");
 
         try (
                 ChatServer server = new ChatServer(tcpPort, udpPort, poolSize);
@@ -27,11 +27,11 @@ public class Main {
             Thread.sleep(2000);
 
             // Iniciar servidor TCP legacy
-            System.out.println("✅ Todos los servidores inicializados - Listo para conexiones");
+            System.out.println("Todos los servidores inicializados - Listo para conexiones");
             server.start();
 
         } catch (Exception e) {
-            System.err.println("❌ Error iniciando servidores: " + e.getMessage());
+            System.err.println(" Error iniciando servidores: " + e.getMessage());
             e.printStackTrace();
         }
     }

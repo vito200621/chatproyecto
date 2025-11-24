@@ -1,6 +1,5 @@
 import Ice from 'ice';
 
-// Importar los stubs generados (asegúrate de que la ruta sea correcta)
 import { Chat, AudioCall } from '../../generated/Chat.js';
 
 class IceChatClient {
