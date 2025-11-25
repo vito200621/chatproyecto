@@ -11,6 +11,8 @@ class TCPClient {
         this.connected = false;
         this.clientId = null;
         this.messageCallback = null;
+        // Múltiples listeners para eventos de línea recibida
+        this.messageListeners = new Set();
         this.buffer = '';
         this.messageQueue = []; // Cola de mensajes entrantes
     }
@@ -85,6 +87,12 @@ class TCPClient {
         if (this.messageCallback) {
             this.messageCallback(message);
         }
+        // Notificar a listeners adicionales
+        if (this.messageListeners && this.messageListeners.size > 0) {
+            for (const fn of this.messageListeners) {
+                try { fn(message); } catch (e) { /* ignore listener errors */ }
+            }
+        }
     }
 
     /**
@@ -101,6 +109,80 @@ class TCPClient {
      */
     onMessage(callback) {
         this.messageCallback = callback;
+    }
+
+    /**
+     * Añadir un listener temporal de mensajes de texto (por línea)
+     */
+    addMessageListener(fn) {
+        this.messageListeners.add(fn);
+        return () => this.messageListeners.delete(fn);
+    }
+
+    /**
+     * Solicita al servidor la lista de grupos y espera la respuesta multi-línea
+     * Formato esperado (desde ChatServer.listGroups):
+     * --- GRUPOS DISPONIBLES ---
+     * - <groupName> (<n> miembros)
+     * ...
+     * Únete con: /joinGroup <nombre>
+     */
+    async listGroupsWait(timeoutMs = 1500) {
+        if (!this.connected) throw new Error('No conectado');
+
+        return new Promise(async (resolve, reject) => {
+            const lines = [];
+            let started = false;
+            const cancel = this.addMessageListener((line) => {
+                if (line.includes('--- GRUPOS DISPONIBLES ---')) {
+                    started = true;
+                    lines.length = 0; // reset lines from this point
+                    return;
+                }
+                if (!started) return;
+
+                // Fin del bloque
+                if (line.startsWith('Únete con:')) {
+                    // Parsear grupos
+                    const groups = [];
+                    for (const l of lines) {
+                        const m = l.match(/^\-\s+(.+?)\s+\(/);
+                        if (m) groups.push(m[1]);
+                    }
+                    cancel();
+                    clearTimeout(timer);
+                    resolve(groups);
+                    return;
+                }
+
+                // Acumular línea
+                lines.push(line);
+            });
+
+            // Timeout
+            const timer = setTimeout(() => {
+                try { cancel(); } catch (_) {}
+                // Mejor devolver lo que tengamos si empezó
+                if (lines.length > 0) {
+                    const groups = [];
+                    for (const l of lines) {
+                        const m = l.match(/^\-\s+(.+?)\s+\(/);
+                        if (m) groups.push(m[1]);
+                    }
+                    resolve(groups);
+                } else {
+                    reject(new Error('Timeout esperando lista de grupos'));
+                }
+            }, timeoutMs);
+
+            try {
+                await this.send('/listGroups');
+            } catch (err) {
+                cancel();
+                clearTimeout(timer);
+                reject(err);
+            }
+        });
     }
 
     /**

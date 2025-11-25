@@ -57,11 +57,7 @@
     </div>
 
     <script>
-        const CONFIG = {
-            useIce: true,  // Intentar usar Ice primero
-            iceEndpoint: 'ws://localhost:10000',
-            fallbackToHttp: false  // No usar HTTP fallback por ahora
-        };
+        const PROXY_URL = `${window.location.protocol}//${window.location.host}`;
 
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -80,33 +76,38 @@
             btnLoading.style.display = 'inline-block';
 
             try {
-                // Simular conexión exitosa (modo demo)
-                const clientId = Math.floor(Math.random() * 1000) + 1;
+                // Solicitar conexión real al proxy → servidor Java
+                const res = await fetch(PROXY_URL + '/api/connect', { method: 'POST' });
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({ error: 'Error desconocido' }));
+                    throw new Error(err.error || 'No se pudo conectar al servidor');
+                }
+                const data = await res.json();
+                if (!data.success || !data.clientId) {
+                    throw new Error(data.error || 'Respuesta inválida del servidor');
+                }
 
-                // Guardar en sessionStorage
-                sessionStorage.setItem('clientId', clientId.toString());
+                const clientId = data.clientId;
+                sessionStorage.setItem('clientId', String(clientId));
 
-                // Mostrar mensaje de éxito
-                successMessage.textContent = `✓ Conectado en modo demo. Tu ID: ${clientId}`;
+                successMessage.textContent = `✓ Conectado. Tu ID: ${clientId}`;
                 successMessage.style.display = 'block';
 
-                // Redirigir a la página de chat
                 setTimeout(() => {
                     window.location.href = 'chat.html';
-                }, 1000);
+                }, 800);
 
             } catch (error) {
                 console.error('Error:', error);
                 errorMessage.textContent = `✗ Error: ${error.message}`;
                 errorMessage.style.display = 'block';
-
                 connectBtn.disabled = false;
                 btnText.style.display = 'inline-block';
                 btnLoading.style.display = 'none';
             }
         });
 
-        // Verificar sesión existente
+        // Si ya hay sesión previa, ir directo al chat
         window.addEventListener('DOMContentLoaded', () => {
             const clientId = sessionStorage.getItem('clientId');
             if (clientId) {

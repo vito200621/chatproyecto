@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat - Diagnóstico</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 20px;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #666;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f9f9f9;
+            border-left: 4px solid #007bff;
+            border-radius: 4px;
+        }
+        .test-item {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+            gap: 10px;
+        }
+        .status {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 12px;
+        }
+        .status.loading { background: #ffc107; }
+        .status.success { background: #28a745; }
+        .status.error { background: #dc3545; }
+        .test-label {
+            flex: 1;
+        }
+        .test-value {
+            font-family: monospace;
+            background: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            max-width: 300px;
+            overflow: auto;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1em;
+            margin-top: 10px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .log-box {
+            background: #222;
+            color: #0f0;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+        .log-entry {
+            margin: 3px 0;
+            padding: 2px 0;
+        }
+        .log-info { color: #0f0; }
+        .log-warn { color: #ff0; }
+        .log-error { color: #f00; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Diagnóstico del Chat</h1>
+        
+        <h2>Conectividad Básica</h2>
+        <div class="test-section">
+            <div class="test-item">
+                <span class="status" id="statusHostname">📍</span>
+                <span class="test-label">Tu hostname/IP:</span>
+                <span class="test-value" id="valueHostname">-</span>
+            </div>
+            <div class="test-item">
+                <span class="status" id="statusProxy">⏳</span>
+                <span class="test-label">Proxy (3000):</span>
+                <span class="test-value" id="valueProxy">Verificando...</span>
+            </div>
+            <div class="test-item">
+                <span class="status" id="statusJava">⏳</span>
+                <span class="test-label">Java Server (5000):</span>
+                <span class="test-value" id="valueJava">Verificando...</span>
+            </div>
+            <div class="test-item">
+                <span class="status" id="statusWebSocket">⏳</span>
+                <span class="test-label">WebSocket:</span>
+                <span class="test-value" id="valueWebSocket">Verificando...</span>
+            </div>
+        </div>
+
+        <h2>Endpoints API</h2>
+        <div class="test-section">
+            <div class="test-item">
+                <span class="status" id="statusConnect">⏳</span>
+                <span class="test-label">/api/connect (POST):</span>
+                <span class="test-value" id="valueConnect">Verificando...</span>
+            </div>
+            <div class="test-item">
+                <span class="status" id="statusClients">⏳</span>
+                <span class="test-label">/api/clients (GET):</span>
+                <span class="test-value" id="valueClients">Verificando...</span>
+            </div>
+        </div>
+
+        <h2>Registro WebSocket</h2>
+        <button onclick="startWebSocketTest()">🔌 Probar Conexión WebSocket</button>
+        <div class="log-box" id="logBox"></div>
+    </div>
+
+    <script>
+        const LOG_LINES = [];
+        const MAX_LOGS = 50;
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = `[${timestamp}] ${message}`;
+            LOG_LINES.push({ message: entry, type });
+            
+            if (LOG_LINES.length > MAX_LOGS) LOG_LINES.shift();
+            
+            const logBox = document.getElementById('logBox');
+            logBox.innerHTML = LOG_LINES.map(line => 
+                `<div class="log-entry log-${line.type}">${line.message}</div>`
+            ).join('');
+            logBox.scrollTop = logBox.scrollHeight;
+        }
+
+        function updateStatus(elementId, status, value) {
+            const statusEl = document.getElementById(elementId);
+            const valueEl = document.getElementById(elementId.replace('status', 'value'));
+            
+            statusEl.classList.remove('loading', 'success', 'error');
+            if (status === 'loading') statusEl.classList.add('loading'), statusEl.textContent = '⏳';
+            else if (status === 'success') statusEl.classList.add('success'), statusEl.textContent = '✅';
+            else if (status === 'error') statusEl.classList.add('error'), statusEl.textContent = '❌';
+            
+            if (value) valueEl.textContent = value;
+        }
+
+        async function runDiagnostics() {
+            log('=== Iniciando diagnóstico ===', 'info');
+            
+            // Hostname/IP
+            const hostname = window.location.hostname;
+            const port = window.location.port || 80;
+            document.getElementById('valueHostname').textContent = `${hostname}:${port}`;
+            log(`Hostname detectado: ${hostname}:${port}`, 'info');
+            
+            // Proxy
+            updateStatus('statusProxy', 'loading');
+            try {
+                const response = await fetch(`http://${hostname}:3000/api/clients`);
+                if (response.ok) {
+                    updateStatus('statusProxy', 'success', '✓ Respondiendo');
+                    log('✓ Proxy en puerto 3000 respondiendo', 'info');
+                } else {
+                    updateStatus('statusProxy', 'error', `Error ${response.status}`);
+                    log(`✗ Proxy respondió con error: ${response.status}`, 'error');
+                }
+            } catch (err) {
+                updateStatus('statusProxy', 'error', 'No responde');
+                log(`✗ No se pudo conectar al proxy: ${err.message}`, 'error');
+            }
+
+            // Java Server (TCP)
+            updateStatus('statusJava', 'loading');
+            try {
+                const response = await fetch(`http://${hostname}:5000`, { 
+                    method: 'HEAD',
+                    mode: 'no-cors'
+                });
+                updateStatus('statusJava', 'success', '✓ Activo');
+                log('✓ Java Server en puerto 5000 detectado', 'info');
+            } catch (err) {
+                updateStatus('statusJava', 'warn', 'No detectado');
+                log('⚠️ No se pudo verificar Java Server (podría estar bien)', 'warn');
+            }
+
+            // /api/connect
+            updateStatus('statusConnect', 'loading');
+            try {
+                const response = await fetch(`http://${hostname}:3000/api/connect`, { method: 'POST' });
+                const data = await response.json();
+                if (data.success) {
+                    updateStatus('statusConnect', 'success', `ID: ${data.clientId}`);
+                    log(`✓ /api/connect devolvió clientId: ${data.clientId}`, 'info');
+                    window.testClientId = data.clientId;
+                } else {
+                    updateStatus('statusConnect', 'error', 'Error');
+                    log(`✗ /api/connect falló: ${data.error}`, 'error');
+                }
+            } catch (err) {
+                updateStatus('statusConnect', 'error', err.message.substring(0, 20));
+                log(`✗ Error en /api/connect: ${err.message}`, 'error');
+            }
+
+            // /api/clients
+            updateStatus('statusClients', 'loading');
+            try {
+                const response = await fetch(`http://${hostname}:3000/api/clients`);
+                const data = await response.json();
+                const count = data.clients ? data.clients.length : 0;
+                updateStatus('statusClients', 'success', `${count} clientes`);
+                log(`✓ /api/clients devolvió ${count} cliente(s)`, 'info');
+                if (data.stats) {
+                    log(`  - TCP: ${data.stats.tcp_connections}, WebSocket: ${data.stats.websocket_clients}`, 'info');
+                }
+            } catch (err) {
+                updateStatus('statusClients', 'error', err.message.substring(0, 20));
+                log(`✗ Error en /api/clients: ${err.message}`, 'error');
+            }
+
+            log('=== Diagnóstico completado ===', 'info');
+        }
+
+        function startWebSocketTest() {
+            log('Intentando conectar WebSocket...', 'info');
+            updateStatus('statusWebSocket', 'loading');
+            
+            const wsUrl = `ws://${window.location.hostname}:3000`;
+            log(`Conectando a: ${wsUrl}`, 'info');
+            
+            try {
+                const ws = new WebSocket(wsUrl);
+                
+                ws.onopen = () => {
+                    log('✓ WebSocket abierto', 'info');
+                    updateStatus('statusWebSocket', 'success', 'Conectado');
+                    
+                    // Registrarse
+                    const clientId = window.testClientId || Math.floor(Math.random() * 10000);
+                    const msg = {
+                        type: 'register',
+                        clientId: clientId,
+                        username: `TestUser_${clientId}`
+                    };
+                    log(`Enviando registro: ${JSON.stringify(msg)}`, 'info');
+                    ws.send(JSON.stringify(msg));
+                };
+                
+                ws.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        log(`Mensaje recibido: ${JSON.stringify(data)}`, 'info');
+                        if (data.type === 'registered') {
+                            log(`✓ ¡Registrado exitosamente con ID ${data.clientId}!`, 'info');
+                        }
+                    } catch (err) {
+                        log(`Mensaje binario (${event.data.byteLength} bytes)`, 'info');
+                    }
+                };
+                
+                ws.onerror = (err) => {
+                    log(`✗ Error WebSocket: ${err.message}`, 'error');
+                    updateStatus('statusWebSocket', 'error', 'Error');
+                };
+                
+                ws.onclose = () => {
+                    log('WebSocket cerrado', 'warn');
+                };
+                
+                // Mantener abierto por 5 segundos
+                setTimeout(() => {
+                    if (ws.readyState === WebSocket.OPEN) {
+                        ws.close();
+                        log('WebSocket cerrado después de prueba', 'info');
+                    }
+                }, 5000);
+                
+            } catch (err) {
+                log(`✗ No se pudo crear WebSocket: ${err.message}`, 'error');
+                updateStatus('statusWebSocket', 'error', err.message.substring(0, 20));
+            }
+        }
+
+        // Ejecutar diagnóstico al cargar
+        window.addEventListener('load', () => {
+            log('Página cargada', 'info');
+            runDiagnostics();
+            
+            // Reintentar cada 10 segundos
+            setInterval(runDiagnostics, 10000);
+        });
+    </script>
+</body>
+</html>

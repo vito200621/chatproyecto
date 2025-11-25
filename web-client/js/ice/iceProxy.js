@@ -23,6 +23,8 @@ class ICEProxy {
         return new Promise((resolve, reject) => {
             try {
                 this.ws = new WebSocket(this.wsUrl);
+                // Asegurar que los mensajes binarios lleguen como ArrayBuffer (no Blob)
+                try { this.ws.binaryType = 'arraybuffer'; } catch (_) {}
                 
                 this.ws.onopen = () => {
                     console.log('[ICE Proxy] WebSocket conectado');
@@ -159,6 +161,7 @@ class ICEProxy {
         this.ws.send(JSON.stringify({
             type: 'voicenote',
             clientId: this.clientId,
+            fromClientId: this.clientId,
             toType: targetType,
             target: targetId,
             filename: fn,
