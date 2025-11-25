@@ -9,10 +9,66 @@ const appState = {
 
 // ==================== Configuración ====================
 const PROXY_URL = 'http://localhost:3000';
+const WS_URL = 'ws://localhost:3000';
 let iceClient = null;
 let currentIceUser = null;
+let ws = null;
+
+function initWebSocket() {
+    try {
+        ws = new WebSocket(WS_URL);
+        ws.addEventListener('open', () => {
+            console.log('[WS] conectado al proxy');
+            if (appState.clientId) {
+                ws.send(JSON.stringify({ type: 'register', clientId: appState.clientId }));
+            }
+        });
+        ws.addEventListener('message', (ev) => {
+            try {
+                const data = JSON.parse(ev.data);
+                handleWSMessage(data);
+            } catch (err) {
+                console.error('[WS] mensaje inválido:', err);
+            }
+        });
+        ws.addEventListener('close', () => { console.log('[WS] desconectado'); });
+    } catch (err) {
+        console.error('No se pudo inicializar WebSocket:', err);
+    }
+}
+
+function handleWSMessage(msg) {
+    if (!msg || !msg.type) return;
+    if (msg.type === 'registered') {
+        console.log('[WS] registrado con id', msg.clientId);
+        return;
+    }
+    if (msg.type === 'voicenote-sent') {
+        showSystemMessage(`Nota de voz enviada a ${msg.toType} ${msg.target}`);
+        return;
+    }
+    if (msg.type === 'signal') {
+        // Señalización (SDP/ICE) entre navegadores - reenviar a manejador si existe
+        if (msg.signalType === 'offer' || msg.signalType === 'answer' || msg.signalType === 'candidate') {
+            // manejar según implementación de WebRTC/RTC
+            console.log('[WS] señal recibida', msg);
+        }
+    }
+}
+
+// helpers
+function arrayBufferToBase64(buffer) {
+    let binary = '';
+    const bytes = new Uint8Array(buffer);
+    const len = bytes.byteLength;
+    for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+}
 
 // ==================== Inicialización ====================
+
 document.addEventListener('DOMContentLoaded', async () => {
     // Primero inicializar Ice
     await initializeIceClient();
@@ -59,6 +115,9 @@ async function initializeWithIce() {
         document.getElementById('currentUserId').textContent = currentIceUser.id;
         appState.clientId = currentIceUser.id;
 
+        // Inicializar websocket para funcionalidades en tiempo real (voicenotes, señalización)
+        initWebSocket();
+
         // Mostrar que estamos usando Ice
         showSystemMessage("Conectado via Ice RPC - Mensajería en tiempo real activada");
 
@@ -83,6 +142,9 @@ async function initializeWithHttp() {
 
     appState.clientId = parseInt(clientId);
     document.getElementById('currentUserId').textContent = clientId;
+
+    // Inicializar websocket también en modo HTTP
+    initWebSocket();
 
     //setupEventListeners();
     //loadLocalData();
@@ -133,6 +195,84 @@ function processIceVoiceNote(from, filename, data) {
 
     // Opcional: reproducir automáticamente
     playVoiceNote(data);
+}
+
+// Reproductor simple para notas de voz recibidas (acepta base64 o ArrayBuffer/Uint8Array)
+function playVoiceNote(data) {
+    try {
+        let blob;
+        if (!data) return;
+        if (typeof data === 'string') {
+            // base64 string
+            const binary = atob(data);
+            const len = binary.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
+            blob = new Blob([bytes.buffer], { type: 'audio/webm' });
+        } else if (data instanceof ArrayBuffer) {
+            blob = new Blob([data], { type: 'audio/webm' });
+        } else if (data instanceof Uint8Array) {
+            blob = new Blob([data.buffer], { type: 'audio/webm' });
+        } else {
+            console.warn('Formato de audio desconocido para reproducción');
+            return;
+        }
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        audio.play().catch(err => console.error('Error al reproducir audio:', err));
+    } catch (err) {
+        console.error('playVoiceNote error:', err);
+    }
+}
+
+// Grabar y enviar nota de voz desde el navegador usando MediaRecorder y WebSocket
+async function recordAndSendVoiceNote(toType, target) {
+    if (!navigator.mediaDevices || typeof MediaRecorder === 'undefined') {
+        alert('Tu navegador no soporta grabación de audio (MediaRecorder)');
+        return;
+    }
+
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const recorder = new MediaRecorder(stream);
+        const chunks = [];
+
+        recorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) chunks.push(e.data); };
+
+        recorder.onstop = async () => {
+            const blob = new Blob(chunks, { type: 'audio/webm' });
+            const arrayBuffer = await blob.arrayBuffer();
+            const base64 = arrayBufferToBase64(arrayBuffer);
+            const filename = 'voice_' + Date.now() + '.webm';
+
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'voicenote', toType, target, filename, base64, clientId: appState.clientId }));
+                showSystemMessage('Nota de voz enviada (web)');
+            } else {
+                alert('No conectado al servidor WebSocket');
+            }
+
+            // detener tracks
+            stream.getTracks().forEach(t => t.stop());
+        };
+
+        recorder.start();
+        showSystemMessage('Grabando... presiona OK para detener.');
+        await new Promise((resolve) => {
+            // Pedimos confirmación al usuario para detener la grabación
+            if (confirm('Presiona OK para detener la grabación')) {
+                recorder.stop();
+                resolve();
+            } else {
+                recorder.stop();
+                resolve();
+            }
+        });
+
+    } catch (err) {
+        console.error('Error al grabar nota de voz:', err);
+        alert('Error al grabar: ' + err.message);
+    }
 }
 
 // ==================== Modificar Handlers para Usar Ice ====================

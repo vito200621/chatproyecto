@@ -13,6 +13,187 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, '../web-client')));
 
+// Crear servidor HTTP explícito para adjuntar WebSocket
+const http = require('http');
+const { WebSocketServer } = require('ws');
+
+// Pool de conexiones TCP
+const server = http.createServer(app);
+
+// Mapa de conexiones WebSocket por clientId (cuando se registren)
+const wsClients = new Map();
+// Mapeo de llamadas activas: "fromId->toId" -> { initiator, receiver, startTime }
+const activeCalls = new Map();
+
+// Crear WebSocket server
+const wss = new WebSocketServer({ server });
+
+wss.on('connection', (ws) => {
+    console.log('[WS] Nueva conexión');
+
+    ws.isAlive = true;
+    ws.on('pong', () => { ws.isAlive = true; });
+
+    ws.on('message', async (msg) => {
+        try {
+            // Soportar mensajes JSON y binarios
+            if (typeof msg === 'string') {
+                const data = JSON.parse(msg);
+                
+                if (data.type === 'register' && data.clientId) {
+                    ws.clientId = data.clientId;
+                    wsClients.set(data.clientId, ws);
+                    ws.send(JSON.stringify({ type: 'registered', clientId: data.clientId }));
+                    console.log('[WS] Cliente registrado:', data.clientId);
+                }
+                
+                else if (data.type === 'voicenote') {
+                    // Envío de nota de voz (grabación de mensaje)
+                    const { toType, target, filename, base64 } = data;
+                    if (!toType || !target || !base64) return;
+                    const buffer = Buffer.from(base64, 'base64');
+                    const tcpClient = connections.get(data.fromClientId || data.clientId);
+                    if (!tcpClient) {
+                        ws.send(JSON.stringify({ type: 'error', message: 'No conectado al servidor Java' }));
+                        return;
+                    }
+
+                    try {
+                        if (toType === 'user') {
+                            await tcpClient.sendVoiceNoteToUser(target, filename, buffer);
+                        } else if (toType === 'group') {
+                            await tcpClient.sendVoiceNoteToGroup(target, filename, buffer);
+                        }
+                        ws.send(JSON.stringify({ type: 'voicenote-sent', toType, target, filename }));
+                    } catch (err) {
+                        console.error('[WS] Error enviando nota de voz:', err.message);
+                        ws.send(JSON.stringify({ type: 'error', message: 'Error al enviar nota: ' + err.message }));
+                    }
+                }
+                
+                else if (data.type === 'call-start') {
+                    // Iniciar llamada entre dos usuarios
+                    const { callerId, receiverId } = data;
+                    const callKey = `${callerId}->${receiverId}`;
+                    activeCalls.set(callKey, { initiator: ws.clientId, receiver: receiverId, startTime: Date.now() });
+                    
+                    console.log('[WS] Llamada iniciada:', callKey);
+                    
+                    // Notificar al receptor si está conectado
+                    if (wsClients.has(receiverId)) {
+                        wsClients.get(receiverId).send(JSON.stringify({ 
+                            type: 'call-incoming', 
+                            callerId,
+                            callKey 
+                        }));
+                    }
+                }
+                
+                else if (data.type === 'call-accept') {
+                    // Aceptar llamada
+                    const { callKey } = data;
+                    if (activeCalls.has(callKey)) {
+                        const call = activeCalls.get(callKey);
+                        const [from, to] = callKey.split('->');
+                        console.log('[WS] Llamada aceptada:', callKey);
+                        
+                        // Notificar al iniciador
+                        if (wsClients.has(from)) {
+                            wsClients.get(from).send(JSON.stringify({ 
+                                type: 'call-accepted', 
+                                callKey 
+                            }));
+                        }
+                    }
+                }
+                
+                else if (data.type === 'call-end') {
+                    // Terminar llamada
+                    const { callKey } = data;
+                    activeCalls.delete(callKey);
+                    const [from, to] = callKey.split('->');
+                    console.log('[WS] Llamada terminada:', callKey);
+                    
+                    // Notificar al otro usuario
+                    const otherClient = from === ws.clientId ? to : from;
+                    if (wsClients.has(otherClient)) {
+                        wsClients.get(otherClient).send(JSON.stringify({ 
+                            type: 'call-ended', 
+                            callKey 
+                        }));
+                    }
+                }
+                
+                else if (data.type === 'call-reject') {
+                    // Rechazar llamada
+                    const { callKey } = data;
+                    activeCalls.delete(callKey);
+                    const [from, to] = callKey.split('->');
+                    console.log('[WS] Llamada rechazada:', callKey);
+                    
+                    if (wsClients.has(from)) {
+                        wsClients.get(from).send(JSON.stringify({ 
+                            type: 'call-rejected', 
+                            callKey 
+                        }));
+                    }
+                }
+                
+            } else if (Buffer.isBuffer(msg)) {
+                // Mensaje binario: streaming de audio durante llamada
+                try {
+                    const jsonSize = msg.readUInt32BE(0);
+                    const jsonStr = msg.toString('utf8', 4, 4 + jsonSize);
+                    const metadata = JSON.parse(jsonStr);
+                    const audioData = msg.slice(4 + jsonSize);
+                    
+                    const { callKey, from } = metadata;
+                    const [fromId, toId] = callKey.split('->');
+                    const targetId = from === fromId ? toId : fromId;
+                    
+                    // Reenviar audio al otro usuario en la llamada
+                    if (wsClients.has(targetId)) {
+                        wsClients.get(targetId).send(msg);
+                    }
+                } catch (err) {
+                    console.error('[WS] Error procesando audio binario:', err.message);
+                }
+            }
+        } catch (err) {
+            console.error('[WS] Error manejando mensaje:', err.message);
+        }
+    });
+
+    ws.on('close', () => {
+        if (ws.clientId) {
+            wsClients.delete(ws.clientId);
+            // Terminar cualquier llamada activa de este usuario
+            for (const [callKey, call] of activeCalls) {
+                if (callKey.includes(ws.clientId)) {
+                    activeCalls.delete(callKey);
+                    const [from, to] = callKey.split('->');
+                    const otherUser = from === ws.clientId ? to : from;
+                    if (wsClients.has(otherUser)) {
+                        wsClients.get(otherUser).send(JSON.stringify({ 
+                            type: 'call-ended', 
+                            callKey 
+                        }));
+                    }
+                }
+            }
+        }
+    });
+});
+
+// Ping/pong para mantener conexiones
+setInterval(() => {
+    wss.clients.forEach((ws) => {
+        if (!ws.isAlive) return ws.terminate();
+        ws.isAlive = false;
+        ws.ping();
+    });
+}, 30000);
+
 // Pool de conexiones TCP
 const connections = new Map();
 
@@ -393,6 +574,21 @@ app.get('/api/clients', (req, res) => {
 });
 
 /**
+ * Endpoint: Servir archivo de nota de voz
+ * GET /api/voice/:conv/:filename
+ */
+app.get('/api/voice/:conv/:filename', (req, res) => {
+    const { conv, filename } = req.params;
+    let dirName = conv;
+    if (!dirName.endsWith('_voice')) dirName = dirName + '_voice';
+    const filepath = path.join(__dirname, '../history', dirName, filename);
+    if (!fs.existsSync(filepath)) {
+        return res.status(404).send('Not found');
+    }
+    res.sendFile(filepath);
+});
+
+/**
  * Endpoint: Obtener mensajes nuevos (polling)
  * GET /api/messages/:clientId
  */
@@ -416,7 +612,7 @@ app.get('/api/messages/:clientId', (req, res) => {
 });
 
 // Iniciar servidor
-app.listen(PORT, () => {
+server.listen(PORT, () => {
     console.log(`[Proxy Server] Escuchando en http://localhost:${PORT}`);
     console.log(`[Proxy Server] Servidor Java en ${JAVA_SERVER_HOST}:${JAVA_SERVER_PORT}`);
 });

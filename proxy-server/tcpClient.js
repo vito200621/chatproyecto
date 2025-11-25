@@ -154,6 +154,50 @@ class TCPClient {
     }
 
     /**
+     * Enviar nota de voz a usuario (envío binario)
+     * Escribe el encabezado esperado por el servidor Java, luego la longitud y los bytes raw
+     */
+    async sendVoiceNoteToUser(targetId, filename, buffer) {
+        return new Promise((resolve, reject) => {
+            if (!this.connected || !this.socket) return reject(new Error('No conectado'));
+            try {
+                // Encabezado textual
+                this.socket.write(`voicenoteUser:${targetId}:${filename}\n`);
+                // Longitud en línea separada
+                this.socket.write(String(buffer.length) + '\n');
+                // Escribir bytes raw
+                this.socket.write(buffer, (err) => {
+                    if (err) return reject(err);
+                    console.log('[TCP] Nota de voz enviada a usuario', targetId, filename, buffer.length);
+                    resolve();
+                });
+            } catch (err) {
+                reject(err);
+            }
+        });
+    }
+
+    /**
+     * Enviar nota de voz a grupo
+     */
+    async sendVoiceNoteToGroup(groupName, filename, buffer) {
+        return new Promise((resolve, reject) => {
+            if (!this.connected || !this.socket) return reject(new Error('No conectado'));
+            try {
+                this.socket.write(`voicenoteGroup:${groupName}:${filename}\n`);
+                this.socket.write(String(buffer.length) + '\n');
+                this.socket.write(buffer, (err) => {
+                    if (err) return reject(err);
+                    console.log('[TCP] Nota de voz enviada a grupo', groupName, filename, buffer.length);
+                    resolve();
+                });
+            } catch (err) {
+                reject(err);
+            }
+        });
+    }
+
+    /**
      * Desconectar del servidor
      */
     disconnect() {

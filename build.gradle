@@ -21,6 +21,10 @@ subprojects {
     }
 
     // Encoding
+
+    dependencies {
+        implementation 'com.zeroc:ice:3.7.10'
+    }
     tasks.withType(JavaCompile).configureEach {
         options.encoding = 'UTF-8'
     }

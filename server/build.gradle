@@ -16,3 +16,8 @@ jar {
     archiveBaseName = 'server'
     archiveVersion = ''
 }
+apply from: 'gradle/ice.gradle'
+
+dependencies {
+    implementation 'com.zeroc:ice:3.7.10'
+}
