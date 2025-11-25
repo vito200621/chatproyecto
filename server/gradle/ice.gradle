@@ -1,0 +1,25 @@
+// server/gradle/ice.gradle
+if (file('src/main/slice/Chat.ice').exists()) {
+    configurations {
+        slice
+    }
+
+    dependencies {
+        slice 'com.zeroc:ice:3.7.10'
+    }
+
+    task compileSlice(type: Exec) {
+        dependsOn configurations.slice
+
+        // Ensure output dir exists
+        doFirst {
+            file('generated-src').mkdirs()
+        }
+
+        // For Windows invoke slice2java and write into generated-src
+        commandLine 'cmd', '/c', 'slice2java', '--output-dir', 'generated-src', 'src/main/slice/Chat.ice'
+    }
+
+    // Make compileJava depend on compileSlice so generated sources are available
+    compileJava.dependsOn compileSlice
+}

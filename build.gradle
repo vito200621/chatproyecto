@@ -1,11 +1,17 @@
 subprojects {
     apply plugin: 'java'
     apply plugin: 'application'
+    apply from: 'gradle/ice.gradle'
 
     // Configure repositories
     repositories {
         mavenCentral()
     }
+
+        dependencies {
+            implementation 'com.zeroc:ice:3.7.10'
+            implementation 'com.zeroc:icestorm:3.7.10' // Para WebSockets
+        }
 
     // Use Java 17 toolchain
     java {
@@ -15,6 +21,10 @@ subprojects {
     }
 
     // Encoding
+
+    dependencies {
+        implementation 'com.zeroc:ice:3.7.10'
+    }
     tasks.withType(JavaCompile).configureEach {
         options.encoding = 'UTF-8'
     }
@@ -33,6 +43,8 @@ subprojects {
     tasks.withType(JavaExec).configureEach {
         workingDir = project.projectDir
     }
+
+
 
     // Helper: print effective buildDir for diagnostics
     tasks.register('printBuildDir') {

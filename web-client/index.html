@@ -57,7 +57,7 @@
     </div>
 
     <script>
-        const PROXY_URL = 'http://localhost:3000';
+        const PROXY_URL = `${window.location.protocol}//${window.location.host}`;
 
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -68,71 +68,53 @@
             const errorMessage = document.getElementById('errorMessage');
             const successMessage = document.getElementById('successMessage');
 
-            // Ocultar mensajes previos
             errorMessage.style.display = 'none';
             successMessage.style.display = 'none';
 
-            // Deshabilitar botón y mostrar spinner
             connectBtn.disabled = true;
             btnText.style.display = 'none';
             btnLoading.style.display = 'inline-block';
 
             try {
-                // Conectar al servidor a través del proxy
-                const response = await fetch(`${PROXY_URL}/api/connect`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    // Guardar clientId en sessionStorage
-                    sessionStorage.setItem('clientId', data.clientId);
-
-                    // Mostrar mensaje de éxito
-                    successMessage.textContent = `✓ Conectado exitosamente. Tu ID: ${data.clientId}`;
-                    successMessage.style.display = 'block';
-
-                    // Redirigir a la página de chat
-                    setTimeout(() => {
-                        window.location.href = 'chat.html';
-                    }, 1000);
-                } else {
-                    throw new Error(data.error || 'Error al conectar');
+                // Solicitar conexión real al proxy → servidor Java
+                const res = await fetch(PROXY_URL + '/api/connect', { method: 'POST' });
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({ error: 'Error desconocido' }));
+                    throw new Error(err.error || 'No se pudo conectar al servidor');
                 }
+                const data = await res.json();
+                if (!data.success || !data.clientId) {
+                    throw new Error(data.error || 'Respuesta inválida del servidor');
+                }
+
+                const clientId = data.clientId;
+                sessionStorage.setItem('clientId', String(clientId));
+
+                successMessage.textContent = `✓ Conectado. Tu ID: ${clientId}`;
+                successMessage.style.display = 'block';
+
+                setTimeout(() => {
+                    window.location.href = 'chat.html';
+                }, 800);
+
             } catch (error) {
                 console.error('Error:', error);
                 errorMessage.textContent = `✗ Error: ${error.message}`;
                 errorMessage.style.display = 'block';
-
-                // Reactivar botón
                 connectBtn.disabled = false;
                 btnText.style.display = 'inline-block';
                 btnLoading.style.display = 'none';
             }
         });
 
-        // Verificar si ya hay una sesión activa
+        // Si ya hay sesión previa, ir directo al chat
         window.addEventListener('DOMContentLoaded', () => {
             const clientId = sessionStorage.getItem('clientId');
             if (clientId) {
-                // Verificar si la conexión sigue activa
-                fetch(`${PROXY_URL}/api/status/${clientId}`)
-                    .then(res => res.json())
-                    .then(data => {
-                        if (data.connected) {
-                            window.location.href = 'chat.html';
-                        }
-                    })
-                    .catch(() => {
-                        // Si hay error, limpiar sessionStorage
-                        sessionStorage.removeItem('clientId');
-                    });
+                window.location.href = 'chat.html';
             }
         });
     </script>
+    <script src="main.js"></script>
 </body>
 </html>

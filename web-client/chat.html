@@ -83,6 +83,11 @@
             </div>
 
             <div id="messageInputContainer" class="message-input-container" style="display: none;">
+                <div class="message-input-controls">
+                    <button id="recordVoiceBtn" class="btn-icon" title="Grabar nota de voz" style="display: none;">🎤</button>
+                    <button id="startCallBtn" class="btn-icon" title="Iniciar llamada" style="display: none;">📞</button>
+                    <button id="endCallBtn" class="btn-icon" title="Terminar llamada" style="display: none; background-color: #d32f2f;">📞❌</button>
+                </div>
                 <form id="messageForm">
                     <input
                         type="text"
@@ -187,6 +192,8 @@
         </div>
     </div>
 
-    <script src="js/app.js"></script>
+    <script src="js/audioManager.js"></script>
+    <script src="js/ice/iceProxy.js"></script>
+    <script src="js/app-new.js"></script>
 </body>
 </html>

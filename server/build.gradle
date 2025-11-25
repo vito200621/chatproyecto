@@ -1,3 +1,5 @@
+
+
 plugins {
     id 'java'
     id 'application'
@@ -13,4 +15,28 @@ jar {
     }
     archiveBaseName = 'server'
     archiveVersion = ''
+    
+    // Create a fat JAR with all dependencies included
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+}
+
+dependencies {
+    implementation 'com.zeroc:ice:3.7.10'
+}
+
+// Include generated sources produced by slice2java
+sourceSets {
+    main {
+        java {
+            // Explicit source directories: include server code and generated stubs.
+            srcDirs = [
+                'src/main/java/server',
+                'src/main/java/ui',
+                'src/main/java/downloads',
+                'generated-src'
+            ]
+        }
+    }
 }
