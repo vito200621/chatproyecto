@@ -16,8 +16,22 @@ jar {
     archiveBaseName = 'server'
     archiveVersion = ''
 }
-apply from: 'gradle/ice.gradle'
 
 dependencies {
     implementation 'com.zeroc:ice:3.7.10'
+}
+
+// Include generated sources produced by slice2java
+sourceSets {
+    main {
+        java {
+            // Explicit source directories: include server code and generated stubs.
+            srcDirs = [
+                'src/main/java/server',
+                'src/main/java/ui',
+                'src/main/java/downloads',
+                'generated-src'
+            ]
+        }
+    }
 }

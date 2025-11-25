@@ -6,3 +6,10 @@ build
 /.vscode
 *.bat
 *.sh
+
+# Generated ZeroC Slice Java stubs
+server/generated-src/
+
+# If you prefer to ignore any previously committed generated stubs under src/main/java
+# uncomment the following line after you've removed them from git history or committed their deletion
+# server/src/main/java/Chat/

@@ -1,17 +1,19 @@
 // gradle/ice.gradle
-configurations {
-    slice
+if (file('src/main/slice/Chat.ice').exists()) {
+    configurations {
+        slice
+    }
+
+    dependencies {
+        slice 'com.zeroc:ice:3.7.10'
+    }
+
+    task compileSlice(type: Exec) {
+        dependsOn configurations.slice
+
+        commandLine 'cmd', '/c', 'slice2java', '--output-dir', 'src/main/java', 'src/main/slice/Chat.ice'
+
+    }
+
+    compileJava.dependsOn compileSlice
 }
-
-dependencies {
-    slice 'com.zeroc:ice:3.7.6'
-}
-
-task compileSlice(type: Exec) {
-    dependsOn configurations.slice
-
-    commandLine 'cmd', '/c', 'slice2java', '--output-dir', 'src/main/java', 'src/main/slice/Chat.ice'
-
-}
-
-compileJava.dependsOn compileSlice
