@@ -19,8 +19,7 @@ public class IceChatServer implements AutoCloseable {
 
             // Configuración para WebSockets
             String[] args = new String[] {
-                    "--Ice.MessageSizeMax=102400", // 100KB para audio
-                    "--Ice.Warn.Connections=true"
+                    "--Ice.MessageSizeMax=102400" // 100KB para audio
             };
 
             communicator = Util.initialize(args);
@@ -30,14 +29,12 @@ public class IceChatServer implements AutoCloseable {
                     "ChatAdapter",
                     "ws -h localhost -p 10000"
             );
-            // En Java:
-            adapter.add(new ChatServiceI(legacyServer), com.zeroc.Ice.Util.stringToIdentity("ChatService"));
 
-            // Registrar servantes
+            // Registrar servantes (ChatService)
             ChatServiceI chatService = new ChatServiceI(legacyServer);
             adapter.add(chatService, Util.stringToIdentity("ChatService"));
 
-            // AudioServiceI puede ser básico por ahora
+            // Registrar servantes (AudioCallService)
             AudioCallServiceI audioService = new AudioCallServiceI(legacyServer);
             adapter.add(audioService, Util.stringToIdentity("AudioCallService"));
 

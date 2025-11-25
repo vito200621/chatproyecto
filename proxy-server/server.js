@@ -142,18 +142,46 @@ wss.on('connection', (ws) => {
             } else if (Buffer.isBuffer(msg)) {
                 // Mensaje binario: streaming de audio durante llamada
                 try {
+                    // Validar tamaño mínimo (4 bytes para UInt32BE + datos)
+                    if (msg.length < 4) {
+                        console.warn('[WS] Buffer binario muy pequeño, ignorando');
+                        return;
+                    }
+                    
                     const jsonSize = msg.readUInt32BE(0);
-                    const jsonStr = msg.toString('utf8', 4, 4 + jsonSize);
-                    const metadata = JSON.parse(jsonStr);
-                    const audioData = msg.slice(4 + jsonSize);
                     
-                    const { callKey, from } = metadata;
-                    const [fromId, toId] = callKey.split('->');
-                    const targetId = from === fromId ? toId : fromId;
+                    // Validar que el tamaño declarado sea razonable (máx 1KB para metadata)
+                    if (jsonSize > 1024 || jsonSize < 10) {
+                        console.warn('[WS] Tamaño JSON inválido:', jsonSize, 'ignorando buffer');
+                        return;
+                    }
                     
-                    // Reenviar audio al otro usuario en la llamada
-                    if (wsClients.has(targetId)) {
-                        wsClients.get(targetId).send(msg);
+                    // Validar que haya suficientes bytes
+                    if (msg.length < 4 + jsonSize) {
+                        console.warn('[WS] Buffer incompleto esperado', 4 + jsonSize, 'recibido', msg.length);
+                        return;
+                    }
+                    
+                    try {
+                        const jsonStr = msg.toString('utf8', 4, 4 + jsonSize);
+                        const metadata = JSON.parse(jsonStr);
+                        const audioData = msg.slice(4 + jsonSize);
+                        
+                        const { callKey, from } = metadata;
+                        if (!callKey || !from) {
+                            console.warn('[WS] Metadata incompleta, falta callKey o from');
+                            return;
+                        }
+                        
+                        const [fromId, toId] = callKey.split('->');
+                        const targetId = from === fromId ? toId : fromId;
+                        
+                        // Reenviar audio al otro usuario en la llamada
+                        if (wsClients.has(targetId)) {
+                            wsClients.get(targetId).send(msg);
+                        }
+                    } catch (jsonErr) {
+                        console.warn('[WS] JSON parse error:', jsonErr.message, 'primeros 50 bytes:', msg.slice(4, 54).toString('utf8', 0, 50));
                     }
                 } catch (err) {
                     console.error('[WS] Error procesando audio binario:', err.message);

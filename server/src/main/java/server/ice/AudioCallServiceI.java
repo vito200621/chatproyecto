@@ -2,8 +2,8 @@ package server.ice;
 
 import com.zeroc.Ice.Current;
 import Chat.*;
-import server.ChatServer;
 import java.util.*;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -11,7 +11,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * Maneja llamadas en tiempo real y streaming de audio entre usuarios
  */
 public class AudioCallServiceI implements AudioCallService {
-    private final ChatServer legacyServer;
+    private final Object legacyServer;
     
     // Registro de llamadas activas: "fromUser->toUser" -> ChatCallbackPrx[]
     private final Map<String, ChatCallbackPrx[]> activeCalls = new ConcurrentHashMap<>();
@@ -19,10 +19,9 @@ public class AudioCallServiceI implements AudioCallService {
     // Mapeo de callbacks registrados: userId -> ChatCallbackPrx
     private final Map<String, ChatCallbackPrx> userCallbacks = new ConcurrentHashMap<>();
 
-    public AudioCallServiceI(ChatServer legacyServer) {
+    public AudioCallServiceI(Object legacyServer) {
         this.legacyServer = legacyServer;
     }
-
     @Override
     public void startCall(String fromUser, String toUser, Current current) throws UserNotFound {
         System.out.println("[Ice Audio] Llamada iniciada de " + fromUser + " a " + toUser);
