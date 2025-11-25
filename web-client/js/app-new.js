@@ -19,8 +19,11 @@ const appState = {
 };
 
 // ==================== Configuración ====================
-const PROXY_URL = 'http://localhost:3000';
-const WS_URL = 'ws://localhost:3000';
+// Detectar URL del proxy automáticamente (funciona en localhost y red local)
+const PROXY_URL = `http://${window.location.hostname}:3000`;
+const WS_URL = `ws://${window.location.hostname}:3000`;
+
+console.log('[App] Conectando a:', PROXY_URL);
 
 // Instancias globales
 let iceProxy = null;        // Conexión WebSocket / ICE
@@ -120,6 +123,24 @@ function setupEventListeners() {
     if (endCallBtn) {
         endCallBtn.addEventListener('click', handleEndCall);
         endCallBtn.style.display = 'none';
+    }
+
+    // Agregar contacto
+    const addContactBtn = document.getElementById('addContactBtn');
+    if (addContactBtn) {
+        addContactBtn.addEventListener('click', handleAddContact);
+    }
+
+    // Refrescar clientes
+    const refreshClientsBtn = document.getElementById('refreshClientsBtn');
+    if (refreshClientsBtn) {
+        refreshClientsBtn.addEventListener('click', loadOnlineClients);
+    }
+
+    // Refrescar grupos
+    const refreshGroupsBtn = document.getElementById('refreshGroupsBtn');
+    if (refreshGroupsBtn) {
+        refreshGroupsBtn.addEventListener('click', loadGroups);
     }
 }
 
@@ -443,6 +464,9 @@ function saveLocalData() {
 
 function startPolling() {
     // Polling cada 2 segundos para mensajes nuevos y clientes online
+    loadOnlineClients(); // Cargar clientes inicialmente
+    loadContacts();      // Cargar contactos inicialmente
+    
     setInterval(async () => {
         try {
             const res = await fetch(PROXY_URL + '/api/messages/' + appState.clientId);
@@ -454,6 +478,124 @@ function startPolling() {
             console.error('[App] Error en polling:', err);
         }
     }, 2000);
+
+    // Refrescar clientes online cada 5 segundos
+    setInterval(loadOnlineClients, 5000);
+}
+
+async function loadOnlineClients() {
+    try {
+        const res = await fetch(PROXY_URL + '/api/clients');
+        if (!res.ok) {
+            console.warn('[App] API /api/clients no disponible, mostrando lista vacía');
+            displayOnlineClients([]);
+            return;
+        }
+        const data = await res.json();
+        appState.onlineClients = data.clients || [];
+        displayOnlineClients(appState.onlineClients);
+    } catch (err) {
+        console.error('[App] Error cargando clientes online:', err);
+        displayOnlineClients([]);
+    }
+}
+
+function displayOnlineClients(clients) {
+    const list = document.getElementById('onlineClientsList');
+    if (!list) return;
+
+    if (!clients || clients.length === 0) {
+        list.innerHTML = '<p class="empty-message">No hay clientes conectados</p>';
+        return;
+    }
+
+    list.innerHTML = clients
+        .filter(c => c.id !== appState.clientId) // Excluir el cliente actual
+        .map(client => `
+            <div class="contact-item" onclick="handleSelectClientAsContact(${client.id}, '${client.name || 'Usuario ' + client.id}')">
+                <span class="contact-name">${client.name || 'Usuario ' + client.id}</span>
+                <span class="contact-status online">●</span>
+            </div>
+        `)
+        .join('');
+}
+
+function handleSelectClientAsContact(clientId, clientName) {
+    // Agregar a contactos automáticamente
+    const contact = { id: clientId, name: clientName, type: 'user' };
+    
+    // Verificar si ya existe
+    const exists = appState.contacts.some(c => c.id === clientId);
+    if (!exists) {
+        appState.contacts.push(contact);
+        saveLocalData();
+        showSystemMessage(`${clientName} agregado a contactos`);
+    }
+
+    // Abrir el chat con el contacto
+    selectChat('user', clientId, clientName);
+}
+
+function loadContacts() {
+    displayContacts();
+}
+
+function displayContacts() {
+    const list = document.getElementById('contactsList');
+    if (!list) return;
+
+    if (!appState.contacts || appState.contacts.length === 0) {
+        list.innerHTML = '<p class="empty-message">No hay contactos</p>';
+        return;
+    }
+
+    list.innerHTML = appState.contacts
+        .map(contact => `
+            <div class="contact-item" onclick="selectChat('user', ${contact.id}, '${contact.name}')">
+                <span class="contact-name">${contact.name}</span>
+            </div>
+        `)
+        .join('');
+}
+
+function loadGroups() {
+    displayGroups();
+}
+
+function displayGroups() {
+    const list = document.getElementById('groupsList');
+    if (!list) return;
+
+    if (!appState.groups || appState.groups.length === 0) {
+        list.innerHTML = '<p class="empty-message">No hay grupos</p>';
+        return;
+    }
+
+    list.innerHTML = appState.groups
+        .map(group => `
+            <div class="contact-item" onclick="selectChat('group', '${group}', '${group}')">
+                <span class="contact-name">${group}</span>
+            </div>
+        `)
+        .join('');
+}
+
+function handleAddContact() {
+    const contactId = prompt('ID del usuario:');
+    if (!contactId) return;
+    
+    const contactName = prompt('Nombre (opcional):') || `Usuario ${contactId}`;
+    const contact = { id: parseInt(contactId), name: contactName, type: 'user' };
+    
+    const exists = appState.contacts.some(c => c.id === parseInt(contactId));
+    if (!exists) {
+        appState.contacts.push(contact);
+        saveLocalData();
+        displayContacts();
+        showSystemMessage(`${contactName} agregado a contactos`);
+    } else {
+        showSystemMessage('Este contacto ya existe');
+    }
 }
 
 function escapeHtml(text) {

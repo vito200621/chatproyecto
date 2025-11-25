@@ -586,13 +586,24 @@ app.get('/api/status/:clientId', (req, res) => {
 app.get('/api/clients', (req, res) => {
     const clients = [];
 
+    // Agregar clientes TCP conectados
     connections.forEach((tcpClient, clientId) => {
         if (tcpClient.isConnected()) {
             clients.push({
                 id: clientId,
-                connected: true
+                connected: true,
+                type: 'tcp'
             });
         }
+    });
+
+    // Agregar clientes WebSocket registrados
+    wsClients.forEach((ws, clientId) => {
+        clients.push({
+            id: clientId,
+            connected: true,
+            type: 'websocket'
+        });
     });
 
     res.json({
@@ -639,10 +650,33 @@ app.get('/api/messages/:clientId', (req, res) => {
     });
 });
 
-// Iniciar servidor
-server.listen(PORT, () => {
-    console.log(`[Proxy Server] Escuchando en http://localhost:${PORT}`);
-    console.log(`[Proxy Server] Servidor Java en ${JAVA_SERVER_HOST}:${JAVA_SERVER_PORT}`);
+// Iniciar servidor en todas las interfaces
+const os = require('os');
+
+function getLocalIPs() {
+    const interfaces = os.networkInterfaces();
+    const ips = [];
+    for (const name of Object.keys(interfaces)) {
+        for (const iface of interfaces[name]) {
+            if (iface.family === 'IPv4' && !iface.internal) {
+                ips.push(iface.address);
+            }
+        }
+    }
+    return ips;
+}
+
+server.listen(PORT, '0.0.0.0', () => {
+    const localIPs = getLocalIPs();
+    console.log(`\n[Proxy Server] Escuchando en http://0.0.0.0:${PORT}`);
+    console.log(`[Proxy Server] Accede desde esta PC: http://localhost:${PORT}`);
+    if (localIPs.length > 0) {
+        console.log(`[Proxy Server] Accede desde otra PC en red local:`);
+        localIPs.forEach(ip => {
+            console.log(`  → http://${ip}:${PORT}`);
+        });
+    }
+    console.log(`[Proxy Server] Servidor Java en ${JAVA_SERVER_HOST}:${JAVA_SERVER_PORT}\n`);
 });
 
 // Manejo de cierre

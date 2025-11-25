@@ -15,6 +15,11 @@ jar {
     }
     archiveBaseName = 'server'
     archiveVersion = ''
+    
+    // Create a fat JAR with all dependencies included
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
 }
 
 dependencies {
