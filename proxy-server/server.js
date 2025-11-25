@@ -29,7 +29,7 @@ const activeCalls = new Map();
 const wss = new WebSocketServer({ server });
 
 wss.on('connection', (ws) => {
-    console.log('[WS] Nueva conexión');
+    console.log('[WS] 📱 Nueva conexión WebSocket desde cliente');
 
     ws.isAlive = true;
     ws.on('pong', () => { ws.isAlive = true; });
@@ -39,12 +39,14 @@ wss.on('connection', (ws) => {
             // Soportar mensajes JSON y binarios
             if (typeof msg === 'string') {
                 const data = JSON.parse(msg);
+                console.log(`[WS] Mensaje recibido: type=${data.type}, clientId=${data.clientId}`);
                 
                 if (data.type === 'register' && data.clientId) {
                     ws.clientId = data.clientId;
                     wsClients.set(data.clientId, ws);
                     ws.send(JSON.stringify({ type: 'registered', clientId: data.clientId }));
-                    console.log('[WS] Cliente registrado:', data.clientId);
+                    console.log(`[WS] ✅ Cliente ${data.clientId} registrado exitosamente`);
+                    console.log(`[WS] 📊 Total clientes WebSocket: ${wsClients.size}`);
                 }
                 
                 else if (data.type === 'voicenote') {
@@ -194,7 +196,9 @@ wss.on('connection', (ws) => {
 
     ws.on('close', () => {
         if (ws.clientId) {
+            console.log(`[WS] 👋 Cliente ${ws.clientId} desconectado`);
             wsClients.delete(ws.clientId);
+            console.log(`[WS] 📊 Clientes WebSocket restantes: ${wsClients.size}`);
             // Terminar cualquier llamada activa de este usuario
             for (const [callKey, call] of activeCalls) {
                 if (callKey.includes(ws.clientId)) {
@@ -233,26 +237,44 @@ const JAVA_SERVER_PORT = process.env.JAVA_PORT || 5000;
  * Endpoint: Conectar al servidor Java
  * POST /api/connect
  */
+// Contador simple para asignar IDs sin necesidad de TCP
+let clientCounter = 1000;
+
+/**
+ * Endpoint: Conectar al servidor Java
+ * POST /api/connect
+ * Intenta conectar a TCP pero falla gracefully
+ */
 app.post('/api/connect', async (req, res) => {
     try {
+        // Intentar conexión TCP al servidor Java
         const tcpClient = new TCPClient(JAVA_SERVER_HOST, JAVA_SERVER_PORT);
-        const clientId = await tcpClient.connect();
-
-        // Guardar la conexión en el pool
-        connections.set(clientId, tcpClient);
-
-        console.log(`[Proxy] Cliente ${clientId} conectado`);
+        let clientId;
+        
+        try {
+            clientId = await tcpClient.connect();
+            // Guardar la conexión en el pool
+            connections.set(clientId, tcpClient);
+            console.log(`[Proxy] Cliente ${clientId} conectado a TCP`);
+        } catch (tcpErr) {
+            // Si no puede conectar a TCP, asignar ID local
+            clientId = ++clientCounter;
+            console.warn(`[Proxy] ⚠️  No se pudo conectar a TCP (${tcpErr.message}), usando ID local: ${clientId}`);
+        }
 
         res.json({
             success: true,
             clientId: clientId,
-            message: 'Conectado al servidor exitosamente'
+            message: clientCounter > 1000 ? 'Conectado en modo local (sin servidor Java)' : 'Conectado al servidor exitosamente'
         });
     } catch (error) {
-        console.error('[Proxy] Error al conectar:', error);
-        res.status(500).json({
-            success: false,
-            error: error.message
+        console.error('[Proxy] Error inesperado en /api/connect:', error);
+        // Fallback: asignar ID local de todas formas
+        const clientId = ++clientCounter;
+        res.json({
+            success: true,
+            clientId: clientId,
+            message: 'Conectado en modo local'
         });
     }
 });
@@ -606,9 +628,16 @@ app.get('/api/clients', (req, res) => {
         });
     });
 
+    console.log(`[API] 📊 /api/clients solicitado -> TCP: ${connections.size}, WebSocket: ${wsClients.size}, Total: ${clients.length}`);
+
     res.json({
         success: true,
-        clients: clients
+        clients: clients,
+        stats: {
+            tcp_connections: connections.size,
+            websocket_clients: wsClients.size,
+            timestamp: new Date().toISOString()
+        }
     });
 });
 
