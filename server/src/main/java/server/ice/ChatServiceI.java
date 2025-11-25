@@ -193,7 +193,6 @@ public class ChatServiceI implements ChatService {
     }
 
     // === SEGUNDO registerCallback - CON ChatCallback (SECUNDARIO) ===
-    @Override
     public void registerCallback(String userId, ChatCallback cb, Current current) {
         try {
             directCallbacks.put(userId, cb);
@@ -216,7 +215,7 @@ public class ChatServiceI implements ChatService {
     }
 
     // === MÉTODOS ADICIONALES QUE FALTAN ===
-    @Override
+
     public String[] getGroupMembers(String groupId, Current current) {
         try {
             System.out.println("[Ice] Obteniendo miembros del grupo: " + groupId);
@@ -227,7 +226,7 @@ public class ChatServiceI implements ChatService {
         }
     }
 
-    @Override
+
     public void removeFromGroup(String groupName, String user, Current current) {
         try {
             System.out.println("[Ice] Usuario " + user + " removido de " + groupName);
@@ -236,7 +235,7 @@ public class ChatServiceI implements ChatService {
         }
     }
 
-    @Override
+
     public User getUserInfo(String userId, Current current) {
         try {
             System.out.println("[Ice] Obteniendo información de usuario: " + userId);

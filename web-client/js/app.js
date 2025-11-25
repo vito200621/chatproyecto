@@ -1,3 +1,12 @@
+import IceChatClient from './ice/iceClient.js';
+
+const appState = {
+    clientId: null,
+    currentChat: null,
+    groups: [],
+    messages: []
+};
+
 // ==================== Configuración ====================
 const PROXY_URL = 'http://localhost:3000';
 let iceClient = null;
@@ -18,8 +27,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function initializeIceClient() {
     try {
-        // Importar dinámicamente el cliente Ice
-        const { default: IceChatClient } = await import('./js/ice/IceClient.js');
         iceClient = new IceChatClient();
 
         const connected = await iceClient.initialize();
@@ -77,12 +84,12 @@ async function initializeWithHttp() {
     appState.clientId = parseInt(clientId);
     document.getElementById('currentUserId').textContent = clientId;
 
-    setupEventListeners();
-    loadLocalData();
-    startPolling();
-    loadOnlineClients();
+    //setupEventListeners();
+    //loadLocalData();
+    //startPolling();
+    //loadOnlineClients();
 
-    showSystemMessage("Usando conexión HTTP - Polling activado");
+    // showSystemMessage("Usando conexión HTTP - Polling activado");
 }
 
 // ==================== Funciones Ice ====================

@@ -15,8 +15,6 @@
 
 package Chat;
 
-import com.zeroc.Ice.Current;
-
 public interface ChatService extends com.zeroc.Ice.Object
 {
     User login(String username, com.zeroc.Ice.Current current);
@@ -51,8 +49,6 @@ public interface ChatService extends com.zeroc.Ice.Object
     Message[] getMessageHistory(String userId, String targetId, String targetType, com.zeroc.Ice.Current current);
 
     void registerCallback(String userId, ChatCallbackPrx cb, com.zeroc.Ice.Current current);
-
-    void registerCallback(String userId, ChatCallback cb, Current current);
 
     void unregisterCallback(String userId, com.zeroc.Ice.Current current);
 
@@ -506,13 +502,4 @@ public interface ChatService extends com.zeroc.Ice.Object
         assert(false);
         throw new com.zeroc.Ice.OperationNotExistException(current.id, current.facet, current.operation);
     }
-
-    // Si tu interfaz tiene este método:
-    String[] getGroupMembers(String groupId, Current current);
-
-    // Si tu interfaz tiene este método:
-    void removeFromGroup(String groupName, String user, Current current);
-
-    // Si tu interfaz tiene este método:
-    User getUserInfo(String userId, Current current);
 }

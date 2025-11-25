@@ -24,12 +24,14 @@ public class IceChatServer implements AutoCloseable {
             };
 
             communicator = Util.initialize(args);
-
+            
             // Crear adapter con WebSocket
             ObjectAdapter adapter = communicator.createObjectAdapterWithEndpoints(
                     "ChatAdapter",
                     "ws -h localhost -p 10000"
             );
+            // En Java:
+            adapter.add(new ChatServiceI(legacyServer), com.zeroc.Ice.Util.stringToIdentity("ChatService"));
 
             // Registrar servantes
             ChatServiceI chatService = new ChatServiceI(legacyServer);
